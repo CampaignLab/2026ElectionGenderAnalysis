@@ -1,7 +1,5 @@
 # 2026 England Local Elections — Gender Analysis
 
-**Live page:** https://saulsmcouk.github.io/2026ElectionAnal/
-
 An interactive one-page dashboard analysing the gender breakdown of candidates and elected councillors in the May 2026 England local elections.
 
 ## What it shows
