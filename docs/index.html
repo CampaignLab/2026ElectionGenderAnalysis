@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2026 England Local Elections: Gender Analysis</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script>if(localStorage.getItem('methDismissed')){document.addEventListener('DOMContentLoaded',function(){var t=document.getElementById('methodology-tile');if(t)t.style.display='none';});}</script>
+
+<header>
+  <div class="header-inner">
+    <h1>2026 England Local Elections</h1>
+    <p class="subtitle">Gender breakdown of candidates &amp; elected councillors &middot; May 2026</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- Methodology tile -->
+  <section class="panel methodology-tile" id="methodology-tile">
+    <div class="meth-icon">⚠️</div>
+    <button class="meth-dismiss" aria-label="Dismiss" onclick="this.closest('#methodology-tile').style.display='none';localStorage.setItem('methDismissed','1')">✕</button>
+    <div class="meth-body">
+      <h2>Gender assignment methodology.</h2>
+      <p>
+        <strong>Most candidates (~77%) had no gender recorded in the source data.</strong>
+        Gender was predicted in three stages: (1) the <strong>gender_guesser</strong> library
+        (an open-source name database) and the <strong>ONS historical baby names dataset</strong>
+        (1904&ndash;2024), using birth year where available to account for names whose gender balance
+        has shifted over time (e.g. &ldquo;Ashley&rdquo;, &ldquo;Kim&rdquo;); (2) <strong>Claude Sonnet 4.6</strong>
+        was used to classify names that remained unresolved after step 1.
+      </p>
+      <p>
+        <strong>63 candidates (&lt;0.3%) remain unclassified</strong> &mdash; primarily names where
+        gender could not be determined with confidence. Percentages are calculated only among
+        candidates with a known gender.
+      </p>
+      <p>Gender is treated as binary (male/female) for prediction purposes.</p>
+      <p>
+        <strong>Incumbent status</strong> is determined by matching 2026 candidates against 2025
+        sitting councillors sourced from <a href="https://opencouncildata.co.uk" target="_blank" rel="noopener">opencouncildata.co.uk</a>.
+        Matching uses council name normalisation, ward-level lookup, and full-name fuzzy comparison.
+        Note: incumbents who chose not to re-stand are not counted.
+      </p>
+      <p>
+        <strong>Election type</strong> (full council vs partial) is sourced from the same dataset:
+        councils electing all seats in 2026 are marked <em>Full</em>; those electing by thirds or
+        halves are marked <em>Partial</em>.
+      </p>
+      <p><a href="#" class="meth-full-link" id="btn-open-meth-modal">Read full methodology &rarr;</a></p>
+    </div>
+  </section>
+
+  <!-- Breadcrumb context strip -->
+  <div id="breadcrumb-bar" hidden aria-label="Selection context"></div>
+
+  <!-- Summary cards -->
+  <section class="summary-section" id="summary-cards"></section>
+  <!-- Seat Changes -->
+  <section class="panel" id="seat-changes-section">
+    <div id="seat-changes-content"></div>
+  </section>
+  <section class="panel" id="map-section">
+    <div class="panel-header">
+      <h2>Gender balance by council area</h2>
+      <div class="toggle-group" id="map-toggle">
+        <button class="toggle active" data-mode="candidates">All candidates</button>
+        <button class="toggle" data-mode="elected">Elected only</button>
+      </div>
+    </div>
+    <div class="map-layout">
+      <div id="map"></div>
+      <aside id="map-legend">
+        <div class="legend-title">How to read the colours</div>
+        <div class="legend-hue-block">
+          <div class="legend-row-label"><small>High confidence (gender known)</small></div>
+          <div class="legend-bar confident-bar"></div>
+          <div class="legend-row-label"><small>Low confidence (many low-confidence predictions)</small></div>
+          <div class="legend-bar uncertain-bar"></div>
+          <div class="legend-axis-labels">
+            <span>All male</span><span>50/50</span><span>All female</span>
+          </div>
+        </div>
+        <p class="legend-note">
+          <strong>Hue</strong> shows gender balance among candidates with a known gender (blue&nbsp;=&nbsp;male, pink&nbsp;=&nbsp;female).
+          <strong>Saturation</strong> reflects prediction confidence: washed-out areas have many low- or medium-confidence predictions — the gender balance figure is less certain there.
+        </p>
+        <p class="legend-note" style="color:#888">Grey areas had no elections in this dataset.</p>
+        <div id="map-info" class="map-info-box">
+          <span class="map-info-placeholder">Hover or click a council area</span>
+        </div>
+      </aside>
+    </div>
+    <div id="council-stats" hidden></div>
+  </section>
+
+  <!-- Seat Changes -->
+  <section class="panel" id="seat-changes-section">
+    <div id="seat-changes-content"></div>
+  </section>
+
+  <!-- PARTY CHARTS -->
+  <section class="panel" id="party-section">
+    <div class="panel-header-row">
+      <h2 id="party-heading">By party <span class="subtitle-small">— parties with &ge;30 candidates, sorted by total. Each bar&nbsp;=&nbsp;100% of that party&rsquo;s candidates/elected.</span></h2>
+      <button class="btn-section-export" id="btn-export-party" title="Export party section">&#8659;&nbsp;Export</button>
+    </div>
+    <div class="chart-pair">
+      <div class="chart-box">
+        <h3>Candidates &mdash; gender breakdown</h3>
+        <div class="chart-scroll" id="scroll-party-cands"><canvas id="chart-party-cands"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <h3>Elected &mdash; gender breakdown</h3>
+        <div class="chart-scroll" id="scroll-party-elected"><canvas id="chart-party-elected"></canvas></div>
+      </div>
+    </div>
+    <p class="chart-hint">&#9432; Click a bar to drill into that party &mdash; click again to clear</p>
+    <div id="party-detail" hidden></div>
+  </section>
+
+  <!-- REGION CHARTS -->
+  <section class="panel" id="region-section">
+    <div class="panel-header-row">
+      <h2 id="region-heading">By region</h2>
+      <button class="btn-section-export" id="btn-export-region" title="Export region section">&#8659;&nbsp;Export</button>
+    </div>
+    <div class="chart-pair">
+      <div class="chart-box">
+        <h3>Candidates &mdash; gender breakdown</h3>
+        <div class="chart-scroll" id="scroll-region-cands"><canvas id="chart-region-cands"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <h3>Elected &mdash; gender breakdown</h3>
+        <div class="chart-scroll" id="scroll-region-elected"><canvas id="chart-region-elected"></canvas></div>
+      </div>
+    </div>
+    <p class="chart-hint">&#9432; Click a bar to filter by region &mdash; click again to clear</p>
+    <div id="region-detail" hidden></div>
+  </section>
+
+  <!-- TABLE -->
+  <section class="panel" id="table-section">
+    <div class="panel-header">
+      <h2>By council</h2>
+      <div class="table-controls">
+        <input id="table-search" type="search" placeholder="Filter councils&hellip;" autocomplete="off">
+        <button class="btn-export" id="btn-export-table">&#8659;&nbsp;Export XLSX</button>
+      </div>
+    </div>
+    <p class="table-note">
+      Click a council row to drill down into ward-by-ward results. Click column headers to sort.
+      <strong>Confidence</strong> shows what % of gender predictions are high-confidence — low values mean gender balance figures are less reliable.
+    </p>
+    <div class="table-wrapper">
+      <table id="council-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-col="org_name"          data-type="str">Council</th>
+            <th class="sortable" data-col="total"             data-type="num">Candidates</th>
+            <th class="sortable" data-col="female"            data-type="num">Female Cands</th>
+            <th class="sortable" data-col="pct_female"        data-type="num">% Female</th>
+            <th class="sortable" data-col="pct_high_conf"       data-type="num">Confidence</th>
+            <th class="sortable" data-col="elected_total"     data-type="num">Elected</th>
+            <th class="sortable" data-col="elected_female"    data-type="num">Female Elected</th>
+            <th class="sortable" data-col="pct_female_elected" data-type="num">% Female Elected</th>
+            <th class="sortable" data-col="inc_retention_pct" data-type="num" title="% of 2025 sitting councillors who stood and were re-elected">Inc. Retention</th>
+            <th class="sortable" data-col="avg_turnout"       data-type="num">Avg Turnout</th>
+            <th class="sortable" data-col="election_type"     data-type="str">Election</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<!-- Full methodology modal -->
+<div id="meth-modal" class="modal-overlay" hidden>
+  <div class="modal meth-modal-inner" role="dialog" aria-modal="true" aria-labelledby="meth-modal-title">
+    <div class="modal-header">
+      <h2 id="meth-modal-title">Methodology</h2>
+      <button class="modal-close" id="meth-modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body meth-modal-body" id="meth-modal-body">
+      <!-- Populated by tmplMethodology() in views.js -->
+    </div>
+  </div>
+</div>
+
+<!-- Candidate detail modal -->
+<div id="candidate-modal" class="cand-modal-overlay" hidden>
+  <div class="cand-modal-card" role="dialog" aria-modal="true" aria-labelledby="cand-modal-name">
+    <button class="cand-modal-close" id="cand-modal-close" aria-label="Close">&times;</button>
+    <div id="cand-modal-body"></div>
+  </div>
+</div>
+
+<!-- Drilldown modal -->
+<div id="modal-overlay" class="modal-overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-header">
+      <h2 id="modal-title">Council drilldown</h2>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <!-- Ward list or results table rendered here -->
+    </div>
+  </div>
+</div>
+
+<!-- Export choice modal -->
+<div id="export-modal" hidden>
+  <div class="export-modal-box">
+    <button class="modal-close" id="export-modal-close" aria-label="Close">&times;</button>
+    <h3 id="export-modal-title">Export</h3>
+    <p class="export-modal-desc">Choose a format:</p>
+    <div class="export-choice-row">
+      <button class="export-choice-btn" id="export-choice-excel">
+        <div class="ecb-icon">&#8659;</div>
+        <div class="ecb-label">Excel (.xlsx)</div>
+        <div class="ecb-desc">All chart data + visible drilldown in tabular form</div>
+      </button>
+      <button class="export-choice-btn" id="export-choice-png">
+        <div class="ecb-icon">&#128247;</div>
+        <div class="ecb-label">Image (.png)</div>
+        <div class="ecb-desc">Screenshot of the current section</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <p>Election data: <a href="https://democracyclub.org.uk" target="_blank" rel="noopener">Democracy Club</a> &middot; Incumbent data: <a href="https://opencouncildata.co.uk" target="_blank" rel="noopener">opencouncildata.co.uk</a> &middot; Gender predicted using <strong>gender_guesser</strong>, ONS baby names &amp; <strong>Claude Sonnet 4.6</strong> &middot; &lt;0.3% of candidates remain unclassified</p>
+    <p>ONS data licensed under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener">Open Government Licence v.3.0</a> &middot; Contains OS data &copy; Crown copyright and database right [2026]</p>
+    <p><a href="#" id="footer-meth-link">Methodology</a> &middot; <a href="https://github.com/saulsmcouk/2026ElectionAnalysis" target="_blank" rel="noopener">View source on GitHub</a></p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/export.js"></script>
+<script src="js/views.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var el = document.getElementById('meth-modal-body');
+  if (el) el.innerHTML = tmplMethodology();
+});
+</script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,619 @@
+/* story.js — Labour gender narrative, May 2026 English local elections */
+'use strict';
+
+// ── Constants ────────────────────────────────────────────────────────────────
+// Party display names → canonical data keys as output by build_data.py.
+// Labour + Labour Co-op are merged at build time; all other names are raw CSV values.
+const PARTY_DISPLAY = [
+  { key: 'Labour',       dataKey: 'Labour' },
+  { key: 'Conservative', dataKey: 'Conservative and Unionist Party' },
+  { key: 'Lib Dems',     dataKey: 'Liberal Democrats' },
+  { key: 'Green',        dataKey: 'Green Party' },
+  { key: 'Reform UK',    dataKey: 'Reform UK' },
+];
+
+const COL_FEMALE = '#d6496f';
+const COL_MALE   = '#2171b5';
+const COL_LAB    = '#b5003e';
+
+let _charts = {};
+
+// ── Pure helpers ─────────────────────────────────────────────────────────────
+function r1(n)       { return Math.round(n * 10) / 10; }
+function pct(n, d)   { return d ? r1(n / d * 100) : null; }
+function fmt(n)      { return n == null ? '\u2014' : n.toLocaleString(); }
+function fmtP(n)     { return n == null ? '\u2014' : n + '%'; }
+function sign(n)     { return n > 0 ? '+' : ''; }
+function esc(s)      { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function gapStr(f,m) {
+  if (f == null || m == null) return '\u2014';
+  const g = r1(f - m);
+  const cls = g > 0 ? 'gap-pos' : g < 0 ? 'gap-neg' : 'gap-neutral';
+  return `<span class="${cls}">${sign(g)}${g}pp</span>`;
+}
+
+// ── Party lookup ──────────────────────────────────────────────────────────────
+// Labour + Labour Co-op are merged at build time in build_data.py.
+// All merging happens on the backend; frontend just looks up canonical names.
+function buildPartyMap(partyList) {
+  const map = {};
+  for (const pd of PARTY_DISPLAY) {
+    const found = partyList.find(p => p.party === pd.dataKey);
+    map[pd.key] = found ? Object.assign({}, found) : null;
+  }
+  return map;
+}
+
+// ── HTML helpers ──────────────────────────────────────────────────────────────
+function statCard(val, lbl, sub) {
+  return `<div class="stat-card">
+    <div class="stat-val">${val}</div>
+    <div class="stat-lbl">${esc(lbl)}</div>
+    ${sub ? `<div class="stat-sub">${esc(sub)}</div>` : ''}
+  </div>`;
+}
+
+function buildTable(headers, rows) {
+  const head = headers.map(h => `<th>${h}</th>`).join('');
+  const body = rows.map(r => {
+    const cells = r.cells.map((c, i) => `<td${i > 0 ? ' class="num"' : ''}>${c}</td>`).join('');
+    return `<tr${r.cls ? ` class="${r.cls}"` : ''}>${cells}</tr>`;
+  }).join('');
+  return `<table class="story-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function makeChart(id, config) {
+  if (_charts[id]) _charts[id].destroy();
+  _charts[id] = new Chart(document.getElementById(id), config);
+}
+
+// ── Section: Hero ─────────────────────────────────────────────────────────────
+function renderHero(lab, summary) {
+  const gap = r1(lab.pct_female - summary.pct_female);
+  document.getElementById('hero-pct').textContent = lab.pct_female + '%';
+  document.getElementById('hero-sub').innerHTML =
+    `<strong>${fmt(lab.female)}</strong> Labour women stood out of <strong>${fmt(lab.total)}</strong> ` +
+    `Labour candidates &mdash; ${gap}pp above the national average of ${summary.pct_female}%.`;
+}
+
+// ── Section: Candidates ───────────────────────────────────────────────────────
+function renderCandidates(lab, summary, partyMap) {
+  const con = partyMap['Conservative'];
+  const ref = partyMap['Reform UK'];
+
+  document.getElementById('p1-intro').innerHTML =
+    `In the May 2026 English local elections, Labour fielded <strong>${fmt(lab.female)} women</strong> ` +
+    `out of <strong>${fmt(lab.total)} total candidates</strong> &mdash; a higher proportion than any other ` +
+    `major party. At <strong>${lab.pct_female}%</strong>, Labour&rsquo;s female candidacy rate is ` +
+    `${r1(lab.pct_female - summary.pct_female)}pp above the England-wide figure of ${summary.pct_female}%.`;
+
+  document.getElementById('p1-stats').innerHTML =
+    statCard(lab.pct_female + '%', 'Labour candidates who are women', `${fmt(lab.female)} of ${fmt(lab.total)}`) +
+    statCard(summary.pct_female + '%', 'National average', `${fmt(summary.female_candidates)} of ${fmt(summary.total_candidates)}`) +
+    statCard(con ? con.pct_female + '%' : '\u2014', 'Conservative', '') +
+    statCard(ref ? ref.pct_female + '%' : '\u2014', 'Reform UK', 'lowest major party');
+
+  const labels = PARTY_DISPLAY.map(pd => pd.key);
+  const vals   = PARTY_DISPLAY.map(pd => partyMap[pd.key] ? partyMap[pd.key].pct_female : 0);
+  const colors = PARTY_DISPLAY.map(pd => pd.key === 'Labour' ? COL_LAB : '#aaa');
+
+  makeChart('chart-cands', {
+    type: 'bar',
+    data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 3 }] },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.raw + '%' } },
+      },
+      scales: {
+        x: {
+          beginAtZero: true, max: 55,
+          ticks: { callback: v => v + '%' },
+          title: { display: true, text: '% female candidates' },
+        },
+      },
+    },
+  });
+
+  const grn = partyMap['Green'];
+  document.getElementById('p1-note').textContent =
+    `Green Party also fields high proportions of women (${grn ? grn.pct_female : '\u2014'}%). ` +
+    `Reform UK fields the lowest proportion among the five main parties.`;
+}
+
+// ── Section: Winning ──────────────────────────────────────────────────────────
+function renderWinning(lab, partyMap) {
+  const gap   = r1(lab.female_win_rate - lab.male_win_rate);
+  const ref   = partyMap['Reform UK'];
+  const refGap = ref ? r1(ref.female_win_rate - ref.male_win_rate) : null;
+
+  document.getElementById('p2-intro').innerHTML =
+    `Labour women won at <strong>${lab.female_win_rate}%</strong> &mdash; compared to ` +
+    `<strong>${lab.male_win_rate}%</strong> for Labour men. That <strong>${sign(gap)}${gap}pp gap</strong> ` +
+    `is the largest positive gender win-rate advantage of any major party. Labour women were ` +
+    `<strong>${lab.pct_female}%</strong> of Labour candidates but <strong>${lab.pct_female_elected}%</strong> ` +
+    `of Labour&rsquo;s elected councillors.`;
+
+  document.getElementById('p2-stats').innerHTML =
+    statCard(lab.female_win_rate + '%', 'Labour women win rate', `vs ${lab.male_win_rate}% for Labour men`) +
+    statCard((gap > 0 ? '+' : '') + gap + 'pp', 'Labour gender win gap', 'women outperform men') +
+    statCard(lab.pct_female_elected + '%', 'Labour elected who are women', `vs ${lab.pct_female}% of candidates`) +
+    statCard(fmt(lab.new_female_elected), 'newly elected Labour women', `${lab.new_female_elected_pct}% of new Labour wins`);
+
+  const labels = PARTY_DISPLAY.map(pd => pd.key);
+  const fRates = PARTY_DISPLAY.map(pd => partyMap[pd.key] ? partyMap[pd.key].female_win_rate : 0);
+  const mRates = PARTY_DISPLAY.map(pd => partyMap[pd.key] ? partyMap[pd.key].male_win_rate : 0);
+
+  makeChart('chart-winrates', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Women', data: fRates, backgroundColor: COL_FEMALE, borderRadius: 3 },
+        { label: 'Men',   data: mRates, backgroundColor: COL_MALE,   borderRadius: 3 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.raw + '%' } },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { callback: v => v + '%' },
+          title: { display: true, text: 'Win rate (%)' },
+        },
+      },
+    },
+  });
+
+  document.getElementById('p2-finding').innerHTML =
+    `<strong>Labour women outperform Labour men by ${sign(gap)}${gap}pp</strong> &mdash; the largest positive ` +
+    `gender gap among the five main parties. ` +
+    (refGap !== null
+      ? `Reform UK is the only major party where men win at a higher rate than women (${sign(refGap)}${refGap}pp for women vs men). `
+      : '') +
+    `Notably, Labour women were ${lab.pct_female}% of Labour candidates but ${lab.pct_female_elected}% of ` +
+    `Labour&rsquo;s elected councillors &mdash; women punching above their candidacy weight.`;
+}
+
+// ── Section: Incumbents ───────────────────────────────────────────────────────
+function renderIncumbents(lab, summary) {
+  const labFRet = lab.inc_female_retention_pct;
+  const labMRet = lab.inc_male_retention_pct;
+  const labDiff = r1(labFRet - labMRet);
+  const natFRet = summary.inc_female_retention_pct;
+  const natMRet = summary.inc_male_retention_pct;
+  const natDiff = r1(natFRet - natMRet);
+  const labFInc = lab.inc_female_elected + lab.inc_female_defeated;
+  const labMInc = lab.inc_male_elected   + lab.inc_male_defeated;
+  const natFInc = summary.inc_female_elected + summary.inc_female_defeated;
+  const natMInc = summary.inc_male_elected   + summary.inc_male_defeated;
+
+  document.getElementById('p3-intro').innerHTML =
+    `Of the <strong>${fmt(lab.inc_total)} Labour incumbents</strong> who stood for re-election, ` +
+    `<strong>${lab.inc_female_pct}% were women</strong>. Labour&rsquo;s overall incumbent retention rate ` +
+    `was just <strong>${lab.inc_retention_pct}%</strong> &mdash; well below the national average of ` +
+    `<strong>${summary.inc_retention_pct}%</strong>, reflecting Labour&rsquo;s difficult picture in ` +
+    `defending seats in 2026. ` +
+    `Among Labour incumbents who stood, women were re-elected at <strong>${labFRet}%</strong> ` +
+    `compared to <strong>${labMRet}%</strong> for men &mdash; a difference of ` +
+    `<strong>${sign(labDiff)}${labDiff}pp</strong>.`;
+
+  document.getElementById('p3-stats').innerHTML =
+    statCard(lab.inc_retention_pct + '%', 'Labour incumbent retention', `${fmt(lab.inc_elected)} re-elected of ${fmt(lab.inc_total)}`) +
+    statCard(labFRet + '%', 'Labour women incumbents retained', `${fmt(lab.inc_female_elected)} of ${fmt(labFInc)}`) +
+    statCard(labMRet + '%', 'Labour men incumbents retained', `${fmt(lab.inc_male_elected)} of ${fmt(labMInc)}`) +
+    statCard(summary.inc_retention_pct + '%', 'National all-party retention', `${fmt(summary.inc_elected)} of ${fmt(summary.inc_total)}`);
+
+  const rows = [
+    { cells: ['Labour women (incumbents)', fmt(labFInc), fmt(lab.inc_female_elected), fmt(lab.inc_female_defeated), fmtP(labFRet)] },
+    { cells: ['Labour men (incumbents)',   fmt(labMInc), fmt(lab.inc_male_elected),   fmt(lab.inc_male_defeated),   fmtP(labMRet)] },
+    { cells: ['All parties &mdash; women', fmt(natFInc), fmt(summary.inc_female_elected), fmt(summary.inc_female_defeated), fmtP(natFRet)] },
+    { cells: ['All parties &mdash; men',   fmt(natMInc), fmt(summary.inc_male_elected),   fmt(summary.inc_male_defeated),   fmtP(natMRet)] },
+  ];
+  document.getElementById('p3-table-wrap').innerHTML = buildTable(
+    ['Group', 'Stood', 'Re-elected', 'Defeated', 'Retention rate'],
+    rows
+  );
+
+  document.getElementById('p3-finding').innerHTML =
+    `<strong>Female incumbents do not hold on at higher rates than male incumbents.</strong> ` +
+    `For Labour, women incumbents were retained at ${labFRet}% vs ${labMRet}% for men ` +
+    `(${sign(labDiff)}${labDiff}pp). Nationally the pattern is the same: ${natFRet}% for women vs ` +
+    `${natMRet}% for men (${sign(natDiff)}${natDiff}pp). The gap is very small and consistent. ` +
+    `<br><br>Labour women&rsquo;s overall win-rate advantage (Part&nbsp;2) comes not from incumbents ` +
+    `doing better, but from <strong>newly elected Labour women winning at higher rates than newly ` +
+    `elected Labour men</strong>: ${fmt(lab.new_female_elected)} new Labour women won seats ` +
+    `&mdash; ${lab.new_female_elected_pct}% of all new Labour wins, well above their ${lab.pct_female}% ` +
+    `share of candidacies.`;
+}
+
+// ── Section: Regions ─────────────────────────────────────────────────────────
+function renderRegions(regionLabour, stats) {
+  // Exclude East Midlands (only 14 Labour candidates — unreliable)
+  const data = stats.by_region_outperformance.filter(r => r.region !== 'East Midlands (England)');
+  const londonRow = data.find(r => r.region === 'London');
+
+  document.getElementById('p4-intro').innerHTML =
+    `In <strong>${stats.narrative_flags.regions_women_outperform.filter(r => r !== 'East Midlands (England)').length} ` +
+    `of 8 regions</strong> Labour women win at a higher rate than Labour men. ` +
+    `<strong>London</strong> shows the largest gap &mdash; Labour women win at ` +
+    `<strong>${regionLabour['London'] ? regionLabour['London'].female_win_rate : '\u2014'}%</strong>, ` +
+    `compared to ${regionLabour['London'] ? regionLabour['London'].male_win_rate : '\u2014'}% for men ` +
+    `(+${londonRow ? londonRow.f_minus_m : '\u2014'}pp). ` +
+    `East Midlands is excluded from this analysis: only 14 Labour candidates stood in that region, ` +
+    `insufficient for reliable conclusions.`;
+
+  // Region dropdown options
+  const sel = document.getElementById('region-select');
+  data.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.region;
+    opt.textContent = r.region.replace(' (England)', '');
+    sel.appendChild(opt);
+  });
+
+  // Render table and chart
+  renderRegionTable(data, regionLabour, '');
+
+  const labels = data.map(r => r.region.replace(' (England)', ''));
+  const gaps   = data.map(r => r.f_minus_m);
+  const colors = gaps.map(g => g >= 0 ? '#1a6e3a' : '#b5003e');
+
+  makeChart('chart-regions', {
+    type: 'bar',
+    data: { labels, datasets: [{ data: gaps, backgroundColor: colors, borderRadius: 3 }] },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + (ctx.raw > 0 ? '+' : '') + ctx.raw + 'pp' } },
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Win rate gap (pp): Labour women minus Labour men' },
+          ticks: { callback: v => (v > 0 ? '+' : '') + v + 'pp' },
+        },
+      },
+    },
+  });
+}
+
+function renderRegionTable(data, regionLabour, highlightRegion) {
+  const rows = data.map(r => {
+    const rl  = regionLabour[r.region] || {};
+    return {
+      cells: [
+        r.region.replace(' (England)', ''),
+        fmt(rl.total   || 0),
+        fmtP(rl.pct_female),
+        fmtP(r.f_win_rate),
+        fmtP(r.m_win_rate),
+        gapStr(r.f_win_rate, r.m_win_rate),
+      ],
+      cls: r.region === highlightRegion ? 'highlight' : '',
+    };
+  });
+  document.getElementById('p4-table-wrap').innerHTML = buildTable(
+    ['Region', 'Labour candidates', '% female cands', 'Women win%', 'Men win%', 'F&minus;M gap'],
+    rows
+  );
+}
+
+// ── Section: Election type ────────────────────────────────────────────────────
+function renderElectionType(etPartyMap) {
+  const full    = etPartyMap['full']    && etPartyMap['full']['Labour'];
+  const partial = etPartyMap['partial'] && etPartyMap['partial']['Labour'];
+
+  if (!full || !partial) {
+    document.getElementById('p5-intro').textContent = 'Election type data unavailable.';
+    return;
+  }
+
+  const fullGap    = r1(full.female_win_rate    - full.male_win_rate);
+  const partialGap = r1(partial.female_win_rate - partial.male_win_rate);
+
+  document.getElementById('p5-intro').innerHTML =
+    `England&rsquo;s councils use two main election patterns: <strong>all-out elections</strong> ` +
+    `(all seats at once, every four years) and <strong>partial elections</strong> ` +
+    `(a third or half of seats per year). The gender gap differs sharply between them. ` +
+    `In full elections, Labour women outperform Labour men by ` +
+    `<strong>${sign(fullGap)}${fullGap}pp</strong>; in partial elections the gap is ` +
+    `<strong>${sign(partialGap)}${partialGap}pp</strong>.`;
+
+  document.getElementById('p5-cards').innerHTML =
+    etypeCard('All-out elections', full,    fullGap) +
+    etypeCard('By-thirds / By-halves',  partial, partialGap);
+
+  // Party comparison table
+  const rows = PARTY_DISPLAY.map(pd => {
+    const f = etPartyMap['full']    && etPartyMap['full'][pd.key];
+    const p = etPartyMap['partial'] && etPartyMap['partial'][pd.key];
+    return { cells: [
+      pd.key,
+      f ? fmtP(f.female_win_rate) : '\u2014',
+      f ? fmtP(f.male_win_rate)   : '\u2014',
+      f ? gapStr(f.female_win_rate, f.male_win_rate) : '\u2014',
+      p ? fmtP(p.female_win_rate) : '\u2014',
+      p ? fmtP(p.male_win_rate)   : '\u2014',
+      p ? gapStr(p.female_win_rate, p.male_win_rate) : '\u2014',
+    ]};
+  });
+  document.getElementById('p5-table-wrap').innerHTML = buildTable(
+    ['Party', 'F win% (full)', 'M win% (full)', 'Gap (full)', 'F win% (partial)', 'M win% (partial)', 'Gap (partial)'],
+    rows
+  );
+}
+
+function etypeCard(title, d, gap) {
+  const gCls = gap >= 0 ? 'gap-pos' : 'gap-neg';
+  return `<div class="etype-card">
+    <h3>${title}</h3>
+    <ul class="etype-stat-list">
+      <li><span class="etype-stat-key">Labour candidates</span>
+          <span class="etype-stat-val">${fmt(d.total)}</span></li>
+      <li><span class="etype-stat-key">Women win rate</span>
+          <span class="etype-stat-val">${fmtP(d.female_win_rate)}</span></li>
+      <li><span class="etype-stat-key">Men win rate</span>
+          <span class="etype-stat-val">${fmtP(d.male_win_rate)}</span></li>
+      <li><span class="etype-stat-key">Gender gap</span>
+          <span class="etype-stat-val ${gCls}">${sign(gap)}${gap}pp</span></li>
+      <li><span class="etype-stat-key">% female candidates</span>
+          <span class="etype-stat-val">${fmtP(d.pct_female)}</span></li>
+    </ul>
+  </div>`;
+}
+
+// ── Section: Statistical analysis ────────────────────────────────────────────
+function renderStats(stats) {
+  const c = stats.correlations;
+
+  document.getElementById('p6-intro').innerHTML =
+    `What factors correlate with Labour women winning? Using Pearson correlation at ward level, ` +
+    `we tested three variables against Labour women&rsquo;s win rate across ` +
+    `<strong>${fmt(stats.ward_count_both_genders)} wards</strong> where Labour fielded both male ` +
+    `and female candidates.`;
+
+  const corrDefs = [
+    {
+      vars: 'Turnout vs Labour women&rsquo;s win rate',
+      r: c.turnout_vs_f_win_rate.r,
+      n: c.turnout_vs_f_win_rate.n,
+      dir: c.turnout_vs_f_win_rate.direction,
+      interp: 'In lower-turnout wards, Labour women tend to win more often. Higher turnout may reflect more competitive contests where all candidates face greater challenges.',
+    },
+    {
+      vars: '% female Labour candidates vs women&rsquo;s win rate',
+      r: c.pct_f_cands_vs_f_win_rate.r,
+      n: c.pct_f_cands_vs_f_win_rate.n,
+      dir: c.pct_f_cands_vs_f_win_rate.direction,
+      interp: 'Where Labour fields fewer women, those women tend to win more often. Where Labour fields more women, the win rate falls. The reason for this pattern is unclear from the data alone.',
+    },
+    {
+      vars: 'Council size vs Labour women&rsquo;s win rate',
+      r: c.council_size_vs_f_win_rate.r,
+      n: c.council_size_vs_f_win_rate.n,
+      dir: c.council_size_vs_f_win_rate.direction,
+      interp: 'No meaningful relationship between the size of a council and Labour women&rsquo;s win rate.',
+    },
+  ];
+
+  document.getElementById('p6-corr').innerHTML = corrDefs.map(cc => {
+    const abs = Math.abs(cc.r);
+    const strength = abs < 0.1 ? 'Negligible' : abs < 0.3 ? 'Weak' : abs < 0.5 ? 'Moderate' : 'Strong';
+    const dirCls  = cc.dir === 'positive' ? 'pos' : cc.dir === 'negative' ? 'neg' : 'neut';
+    return `<div class="corr-card">
+      <div class="corr-vars">${cc.vars}</div>
+      <div class="corr-r ${dirCls}">${cc.r > 0 ? '+' : ''}${cc.r.toFixed(4)}</div>
+      <div class="corr-n">${strength} &middot; n&thinsp;=&thinsp;${fmt(cc.n)}</div>
+      <div class="corr-interp">${cc.interp}</div>
+    </div>`;
+  }).join('');
+
+  const selR = c.pct_f_cands_vs_f_win_rate.r.toFixed(2);
+  document.getElementById('p6-finding').innerHTML =
+    `The negative correlation (r&thinsp;=&thinsp;${selR}) between the proportion of female Labour candidates ` +
+    `and Labour women&rsquo;s win rate is the most notable statistical finding, but its cause is unknown. ` +
+    `Multiple explanations are consistent with this pattern and the data alone cannot distinguish between them.`;
+}
+
+// ── Region dropdown wiring ────────────────────────────────────────────────────
+function wireRegionDropdown(regionLabour, stats) {
+  const data = stats.by_region_outperformance.filter(r => r.region !== 'East Midlands (England)');
+  document.getElementById('region-select').addEventListener('change', function () {
+    renderRegionTable(data, regionLabour, this.value);
+  });
+}
+
+// ── XLSX Export ───────────────────────────────────────────────────────────────
+function wireExport(partyMap, regionLabour) {
+  document.getElementById('btn-story-export').addEventListener('click', () =>
+    doExport(partyMap, regionLabour)
+  );
+}
+
+async function doExport(partyMap, regionLabour) {
+  const btn = document.getElementById('btn-story-export');
+  btn.disabled = true;
+  btn.textContent = '\u231b Loading\u2026';
+  try {
+    const cands = await fetch('data/all_candidates.json').then(r => r.json());
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: All candidates
+    const candRows = cands.map(c => ({
+      'Council':   c.council,
+      'Ward':      c.ward,
+      'Name':      c.n,
+      'Party':     c.p,
+      'Gender':    c.g,
+      'Incumbent': c.inc ? 'Yes' : 'No',
+      'Votes':     c.v,
+      'Elected':   c.e ? 'Yes' : 'No',
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(candRows), 'All Candidates');
+
+    // Sheet 2: By party
+    const partyRows = PARTY_DISPLAY.map(pd => {
+      const p = partyMap[pd.key];
+      if (!p) return null;
+      return {
+        'Party':                    pd.key,
+        'Candidates':               p.total,
+        'Female Candidates':        p.female,
+        '% Female Candidates':      p.pct_female,
+        'Elected Total':            p.elected_total,
+        'Female Elected':           p.elected_female,
+        '% Female Elected':         p.pct_female_elected,
+        'Female Win Rate %':        p.female_win_rate,
+        'Male Win Rate %':          p.male_win_rate,
+        'F-M Win Gap pp':           p.female_win_rate != null && p.male_win_rate != null
+                                      ? r1(p.female_win_rate - p.male_win_rate) : null,
+        'Incumbents Stood':         p.inc_total,
+        'Inc Re-elected':           p.inc_elected,
+        'Inc Retention %':          p.inc_retention_pct,
+        'Female Inc Retention %':   p.inc_female_retention_pct,
+        'Male Inc Retention %':     p.inc_male_retention_pct,
+        'New Elected Female %':     p.new_female_elected_pct,
+      };
+    }).filter(Boolean);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(partyRows), 'By Party');
+
+    // Sheet 3: Labour by region
+    const regionRows = Object.entries(regionLabour).map(([rname, rl]) => ({
+      'Region':               rname,
+      'Labour Candidates':    rl.total,
+      'Female Candidates':    rl.female,
+      '% Female Candidates':  rl.pct_female,
+      'Female Elected':       rl.elected_female,
+      '% Female Elected':     rl.pct_female_elected,
+      'Female Win Rate %':    rl.female_win_rate,
+      'Male Win Rate %':      rl.male_win_rate,
+      'F-M Win Gap pp':       rl.female_win_rate != null && rl.male_win_rate != null
+                                ? r1(rl.female_win_rate - rl.male_win_rate) : null,
+      'Inc Female Retain %':  rl.inc_female_retention_pct,
+      'Inc Male Retain %':    rl.inc_male_retention_pct,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(regionRows), 'Labour By Region');
+
+    // Sheet 4: Methodology & Citations
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+      ['DATA SOURCES & LICENCES'],
+      [],
+      ['Source', 'Description', 'Licence / Copyright'],
+      [
+        'Democracy Club (democracyclub.org.uk)',
+        'Candidate and election results data, May 2026 English local elections',
+        'Creative Commons Attribution 4.0 International (CC BY 4.0). https://creativecommons.org/licenses/by/4.0/',
+      ],
+      [
+        'opencouncildata.co.uk',
+        '2025 sitting councillor composition, scraped May 2026. Used for incumbency matching and election type classification.',
+        'See opencouncildata.co.uk for terms.',
+      ],
+      [
+        'Office for National Statistics — Baby Names (England and Wales) 1904–2024',
+        'Used for name-based gender prediction (stage 2 of 3).',
+        'Open Government Licence v3.0. Contains public sector information licensed under the Open Government Licence v3.0. http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/',
+      ],
+      [
+        'OS Local Authority Districts Boundaries (May 2025)',
+        'Council boundary polygons used in the Data Explorer map.',
+        'Contains OS data © Crown copyright and database right [2026]. Contains Royal Mail data © Royal Mail copyright and database right [2026]. Contains public sector information licensed under the Open Government Licence v3.0. http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/',
+      ],
+      [],
+      ['GENDER ASSIGNMENT METHODOLOGY'],
+      [],
+      ['Around 77% of candidates had no gender recorded in the Democracy Club source data.'],
+      ['Gender was predicted algorithmically from candidate first names in three stages:'],
+      [],
+      ['Stage', 'Method', 'Notes'],
+      ['1', 'gender_guesser library', 'Open-source name database covering common international first names. Produces high or medium confidence results.'],
+      ['2', 'ONS historical baby names dataset (1904–2024)', 'Year-aware lookup — accounts for names whose gender balance has shifted over time (e.g. Ashley, Kim). Applied where stage 1 failed and a birth year was available.'],
+      ['3', 'Claude Sonnet 4.6 (AI)', 'Used for ~4,000 names unresolved by stages 1 and 2. The model classified first names by likely gender based on cultural and linguistic context.'],
+      [],
+      ['63 candidates (<0.3%) remain unclassified and are excluded from all percentages.'],
+      ['Gender is treated as binary (male/female) for analysis purposes only.'],
+      ['This is not self-identified gender and should not be treated as such.'],
+      [],
+      ['INCUMBENCY METHODOLOGY'],
+      [],
+      ['A candidate is classified as an incumbent if all three conditions are met:'],
+      ['1. Council match — 2026 council name matched to a 2025 sitting councillor record (names normalised before matching).'],
+      ['2. Ward match — 2026 ward matched against 2025 ward names. Exact match first; fuzzy match (difflib, cutoff 0.6) if exact fails, restricted to wards sharing the same first word.'],
+      ['3. Name match — SOPN name vs sitting councillor name using difflib.SequenceMatcher, threshold >= 0.80.'],
+      ['Incumbents who chose not to re-stand are NOT counted. "Defeated" covers only those who stood in 2026 and lost.'],
+      [],
+      ['NOTES'],
+      [],
+      ['Labour figures combine "Labour Party" and "Labour and Co-operative Party" candidates throughout.'],
+      ['Welsh councils (Newport City Council, Powys County Council) are excluded from all figures.'],
+      ['Correlations are Pearson r computed at ward level. East Midlands excluded from regional analysis (14 Labour candidates).'],
+    ]), 'Methodology & Citations');
+
+    XLSX.writeFile(wb, 'labour-gender-2026-england.xlsx');
+  } catch (err) {
+    alert('Export failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '\u2659 Export\u00a0(.xlsx)';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const [councils, stats] = await Promise.all([
+      fetch('data/councils.json').then(r => r.json()),
+      fetch('data/story_stats.json').then(r => r.json()),
+    ]);
+
+    const partyMap = buildPartyMap(councils.by_party);
+    const lab      = partyMap['Labour'];
+    const summary  = councils.summary;
+
+    // Labour by region — merged at build time, look up directly
+    const regionLabour = {};
+    for (const [rname, rp] of Object.entries(councils.by_region_by_party)) {
+      const found = rp.find(p => p.party === 'Labour');
+      if (found) regionLabour[rname] = found;
+    }
+
+    // Party map per election type
+    const etPartyMap = {};
+    for (const [et, plist] of Object.entries(councils.by_election_type_by_party || {})) {
+      etPartyMap[et] = buildPartyMap(plist);
+    }
+
+    // Inject centralised methodology (defined in views.js)
+    const methEl = document.getElementById('meth-details-body');
+    if (methEl) methEl.innerHTML = tmplMethodology();
+
+    renderHero(lab, summary);
+    renderCandidates(lab, summary, partyMap);
+    renderWinning(lab, partyMap);
+    renderIncumbents(lab, summary);
+    renderRegions(regionLabour, stats);
+    renderElectionType(etPartyMap);
+    renderStats(stats);
+    wireRegionDropdown(regionLabour, stats);
+    wireExport(partyMap, regionLabour);
+
+  } catch (err) {
+    document.querySelector('.story-main').innerHTML =
+      `<div style="padding:3rem 1.5rem;color:#b5003e;max-width:600px;margin:0 auto">` +
+      `<strong>Error loading data:</strong> ${esc(err.message)}</div>`;
+    throw err;
+  }
+}
+
+window.addEventListener('DOMContentLoaded', init);

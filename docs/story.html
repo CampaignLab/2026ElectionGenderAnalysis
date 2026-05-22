@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Labour Women in the 2026 English Local Elections</title>
+  <link rel="stylesheet" href="story.css">
+</head>
+<body>
+
+<nav class="story-nav">
+  <a href="index.html" class="nav-back">&#8592; Data Explorer</a>
+  <span class="nav-title">Labour &amp; Gender &#8212; May 2026</span>
+  <button id="btn-story-export" class="btn-export-story">&#8659; Export&nbsp;(.xlsx)</button>
+</nav>
+
+<header class="story-hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">May 2026 English Local Elections &#8212; Gender Analysis</p>
+    <h1 class="hero-headline">
+      <span id="hero-pct" class="hero-pct">&#8212;</span>
+      <span class="hero-pct-label">of Labour candidates were women</span>
+    </h1>
+    <p id="hero-sub" class="hero-sub">Loading&#8230;</p>
+  </div>
+</header>
+
+<main class="story-main">
+
+  <section class="story-section" id="s-candidates">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-tag">Part 1</span>
+        <h2>The Candidates</h2>
+      </div>
+      <p id="p1-intro" class="section-lead"></p>
+      <div id="p1-stats" class="stat-row"></div>
+      <h3 class="chart-title">Female candidates as % of each party&#8217;s total &#8212; England 2026</h3>
+      <div class="chart-wrap chart-wrap--horiz"><canvas id="chart-cands"></canvas></div>
+      <p id="p1-note" class="chart-note"></p>
+    </div>
+  </section>
+
+  <section class="story-section section-alt" id="s-winning">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-tag">Part 2</span>
+        <h2>Winning</h2>
+      </div>
+      <p id="p2-intro" class="section-lead"></p>
+      <div id="p2-stats" class="stat-row"></div>
+      <h3 class="chart-title">Win rates by gender and party</h3>
+      <div class="chart-wrap"><canvas id="chart-winrates"></canvas></div>
+      <div id="p2-finding" class="finding-box"></div>
+    </div>
+  </section>
+
+  <section class="story-section" id="s-incumbents">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-tag">Part 3</span>
+        <h2>Do Women Incumbents Hold On?</h2>
+      </div>
+      <p id="p3-intro" class="section-lead"></p>
+      <div id="p3-stats" class="stat-row"></div>
+      <div id="p3-table-wrap" class="table-wrap"></div>
+      <div id="p3-finding" class="finding-box"></div>
+    </div>
+  </section>
+
+  <section class="story-section section-alt" id="s-regions">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-tag">Part 4</span>
+        <h2>The Regions</h2>
+      </div>
+      <p id="p4-intro" class="section-lead"></p>
+      <div class="region-filter-row">
+        <label for="region-select" class="filter-label">Highlight region:</label>
+        <select id="region-select"><option value="">All regions</option></select>
+      </div>
+      <div id="p4-table-wrap" class="table-wrap"></div>
+      <h3 class="chart-title">Labour women&#8217;s outperformance vs Labour men by region (win rate gap, pp)</h3>
+      <div class="chart-wrap" id="chart-regions-wrap"><canvas id="chart-regions"></canvas></div>
+    </div>
+  </section>
+
+  <section class="story-section" id="s-eltype">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-tag">Part 5</span>
+        <h2>All-out vs By-thirds Elections</h2>
+      </div>
+      <p id="p5-intro" class="section-lead"></p>
+      <div id="p5-cards" class="etype-cards"></div>
+      <div id="p5-table-wrap" class="table-wrap"></div>
+    </div>
+  </section>
+
+  <section class="story-section section-alt" id="s-stats">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-tag">Part 6</span>
+        <h2>Statistical Analysis</h2>
+      </div>
+      <p id="p6-intro" class="section-lead"></p>
+      <div id="p6-corr" class="corr-grid"></div>
+      <div id="p6-finding" class="finding-box"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="story-footer">
+  <div class="footer-inner">
+    <p>Election data: <a href="https://democracyclub.org.uk" target="_blank" rel="noopener">Democracy Club</a>
+    &middot; Incumbent data: <a href="https://opencouncildata.co.uk" target="_blank" rel="noopener">opencouncildata.co.uk</a>
+    &middot; Gender predicted using <strong>gender_guesser</strong>, ONS baby names &amp; <strong>Claude Sonnet&#160;4.6</strong>
+    &middot; &lt;0.3% of candidates remain unclassified
+    &middot; Labour figures combine &#8220;Labour Party&#8221; and &#8220;Labour and Co&#8209;operative Party&#8221;
+    &middot; Welsh councils excluded.</p>
+    <p class="footer-stat-note">Statistical note: Pearson correlations computed at ward level
+    (<em>n</em> varies by analysis). Correlations below |<em>r</em>|&#8202;=&#8202;0.1 treated as negligible.
+    East Midlands excluded from regional chart (only 14 Labour candidates &#8212; insufficient sample).</p>
+
+    <details class="footer-meth">
+      <summary>Methodology &amp; data sources</summary>
+      <div class="meth-body" id="meth-details-body">
+        <!-- Populated by tmplMethodology() in views.js, called from story.js -->
+      </div>
+    </details>
+
+    <p style="margin-top:1.25rem"><a href="index.html">&#8592; Return to Data Explorer</a></p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/views.js"></script>
+<script src="js/story.js"></script>
+</body>
+</html>
