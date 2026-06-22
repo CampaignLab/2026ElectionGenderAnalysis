@@ -126,6 +126,6 @@ Optional candidate fields (`pid`, `img`, `stmt`, `tw`, `url`, `li`, `bs`, `bd`, 
 
 ## GitHub Pages
 
-Repository: `https://github.com/saulsmcouk/2026ElectionAnalysis.git`  
+Repository: `https://github.com/CampaignLab/2026ElectionGenderAnalysis.git`  
 Pages source: `main` branch, `/docs` folder.  
 After pushing to `main`, changes go live automatically.

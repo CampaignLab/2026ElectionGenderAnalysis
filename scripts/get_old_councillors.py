@@ -60,7 +60,7 @@ print(f"Deduplicated to {len(councils)} unique councils")
 
 # ── 2. Fetch 2025 composition for each council ────────────────────────────────
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (research project; contact via GitHub saulsmcouk/2026ElectionAnalysis)"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (research project; contact via GitHub CampaignLab/2026ElectionGenderAnalysis)"}
 BASE_URL = "https://opencouncildata.co.uk/council.php?c={id}&y=2025"
 
 out_path = pathlib.Path(__file__).parent / "data" / "old_councillors.json"
