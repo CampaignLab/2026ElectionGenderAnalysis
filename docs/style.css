@@ -12,6 +12,27 @@ body {
 a { color: #2171b5; text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+/* Navigation back to the story */
+.story-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1.5rem;
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.nav-back {
+  color: #ccc;
+  text-decoration: none;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.nav-back:hover { color: #fff; }
+
 /* ── Header ──────────────────────────────────────────────────────────────── */
 header {
   background: #1a1a2e;
